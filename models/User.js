@@ -2,6 +2,12 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
+  firebaseId: {
+    type: String,
+    unique: true,
+    sparse: true, // Allow null values and only enforce uniqueness on non-null values
+    trim: true
+  },
   contactNumber: {
     type: String,
     required: true,
@@ -35,7 +41,7 @@ const userSchema = new mongoose.Schema({
   }],
   userType: {
     type: String,
-    enum: ['user', 'admin'],
+    enum: ['user', 'admin', 'broker', 'sub_broker'],
     default: 'user'
   },
   isActive: {
@@ -45,6 +51,43 @@ const userSchema = new mongoose.Schema({
   profileImage: {
     type: String,
     default: null
+  },
+  kycDocuments: [{
+    type: {
+      type: String,
+      enum: ['aadhar', 'pan', 'license', 'other']
+    },
+    url: {
+      type: String,
+      required: true
+    },
+    key: {
+      type: String,
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'verified', 'rejected'],
+      default: 'pending'
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  parentBrokerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
+  verificationStatus: {
+    type: String,
+    enum: ['pending', 'verified', 'rejected'],
+    default: 'pending'
   }
 }, {
   timestamps: true // This automatically adds createdAt and updatedAt
@@ -54,5 +97,6 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ email: 1 });
 userSchema.index({ userType: 1 });
 userSchema.index({ contactNumber: 1 });
+userSchema.index({ firebaseId: 1 });
 
 module.exports = mongoose.model('User', userSchema);

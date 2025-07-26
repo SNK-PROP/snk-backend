@@ -6,6 +6,8 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const statisticsRoutes = require('./routes/statistics');
+const propertiesRoutes = require('./routes/properties');
+const brokersRoutes = require('./routes/brokers');
 
 const app = express();
 const PORT =  5000;
@@ -16,7 +18,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Connect to MongoDB
-mongoose.connect(`mongodb+srv://admin:admin@cluster0.clv14pw.mongodb.net/`, {
+mongoose.connect(`mongodb+srv://admin:admin@cluster0.zist3g3.mongodb.net/`, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -26,6 +28,8 @@ mongoose.connect(`mongodb+srv://admin:admin@cluster0.clv14pw.mongodb.net/`, {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/statistics', statisticsRoutes);
+app.use('/api/properties', propertiesRoutes);
+app.use('/api/brokers', brokersRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
