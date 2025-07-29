@@ -4,13 +4,12 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Property = require('../models/Property');
 const auth = require('../middleware/auth');
-const upload = require('../middleware/upload');
-const s3Service = require('../services/s3Service');
+const { uploadToS3 } = require('../config/s3');
 
 const router = express.Router();
 
 // Register broker/sub-broker
-router.post('/register', upload.fields([
+router.post('/register', uploadToS3.fields([
   { name: 'profilePic', maxCount: 1 },
   { name: 'kycDocument', maxCount: 1 }
 ]), async (req, res) => {
@@ -50,24 +49,18 @@ router.post('/register', upload.fields([
     // Upload profile picture
     let profileImageUrl = null;
     if (req.files && req.files.profilePic) {
-      const uploadResult = await s3Service.uploadFile(req.files.profilePic[0], 'profiles');
-      if (uploadResult.success) {
-        profileImageUrl = uploadResult.url;
-      }
+      profileImageUrl = req.files.profilePic[0].location;
     }
 
     // Upload KYC document
     let kycDocuments = [];
     if (req.files && req.files.kycDocument) {
-      const uploadResult = await s3Service.uploadFile(req.files.kycDocument[0], 'kyc');
-      if (uploadResult.success) {
-        kycDocuments.push({
-          type: kycType,
-          url: uploadResult.url,
-          key: uploadResult.key,
-          status: 'pending'
-        });
-      }
+      kycDocuments.push({
+        type: kycType,
+        url: req.files.kycDocument[0].location,
+        key: req.files.kycDocument[0].key,
+        status: 'pending'
+      });
     }
 
     // Create new broker/sub-broker
@@ -239,7 +232,7 @@ router.put('/:id/verify', auth.auth, async (req, res) => {
 });
 
 // Update broker profile
-router.put('/:id', auth.auth, upload.single('profilePic'), async (req, res) => {
+router.put('/:id', auth.auth, uploadToS3.single('profilePic'), async (req, res) => {
   try {
     const broker = await User.findById(req.params.id);
     if (!broker || !['broker', 'sub_broker'].includes(broker.userType)) {

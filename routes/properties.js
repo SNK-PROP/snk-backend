@@ -2,8 +2,7 @@ const express = require('express');
 const Property = require('../models/Property');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
-const upload = require('../middleware/upload');
-const s3Service = require('../services/s3Service');
+const { uploadToS3, getS3Url } = require('../config/s3');
 
 const router = express.Router();
 
@@ -119,7 +118,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create new property (broker/sub-broker only)
-router.post('/', auth.auth, upload.array('images', 10), async (req, res) => {
+router.post('/', auth.auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user || !['broker', 'sub_broker'].includes(user.userType)) {
@@ -141,16 +140,8 @@ router.post('/', auth.auth, upload.array('images', 10), async (req, res) => {
       features
     } = req.body;
 
-    // Upload images to S3
-    const imageUploads = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const uploadResult = await s3Service.uploadFile(file, 'properties');
-        if (uploadResult.success) {
-          imageUploads.push(uploadResult.url);
-        }
-      }
-    }
+    // Images are now passed as URLs (already uploaded to S3 from frontend)
+    const imageUrls = req.body.images || [];
 
     const property = new Property({
       title,
@@ -162,10 +153,10 @@ router.post('/', auth.auth, upload.array('images', 10), async (req, res) => {
       areaUnit,
       bedrooms: bedrooms ? parseInt(bedrooms) : undefined,
       bathrooms: bathrooms ? parseInt(bathrooms) : undefined,
-      location: JSON.parse(location),
-      amenities: amenities ? JSON.parse(amenities) : [],
-      features: features ? JSON.parse(features) : [],
-      images: imageUploads,
+      location: location,
+      amenities: amenities || [],
+      features: features || [],
+      images: imageUrls,
       brokerId: user._id,
       brokerName: user.fullName,
       brokerContact: user.contactNumber
@@ -184,7 +175,7 @@ router.post('/', auth.auth, upload.array('images', 10), async (req, res) => {
 });
 
 // Update property (broker/sub-broker only)
-router.put('/:id', auth.auth, upload.array('images', 10), async (req, res) => {
+router.put('/:id', auth.auth, async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
     if (!property) {
@@ -212,16 +203,8 @@ router.put('/:id', auth.auth, upload.array('images', 10), async (req, res) => {
       status
     } = req.body;
 
-    // Handle new image uploads
-    const newImages = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const uploadResult = await s3Service.uploadFile(file, 'properties');
-        if (uploadResult.success) {
-          newImages.push(uploadResult.url);
-        }
-      }
-    }
+    // Images are now passed as URLs (already uploaded to S3 from frontend)
+    const imageUrls = req.body.images || property.images;
 
     // Update property fields
     const updateData = {
@@ -234,19 +217,17 @@ router.put('/:id', auth.auth, upload.array('images', 10), async (req, res) => {
       areaUnit,
       bedrooms: bedrooms ? parseInt(bedrooms) : undefined,
       bathrooms: bathrooms ? parseInt(bathrooms) : undefined,
-      location: JSON.parse(location),
-      amenities: amenities ? JSON.parse(amenities) : [],
-      features: features ? JSON.parse(features) : []
+      location: location,
+      amenities: amenities || [],
+      features: features || []
     };
 
     if (status) {
       updateData.status = status;
     }
 
-    // Add new images to existing ones
-    if (newImages.length > 0) {
-      updateData.images = [...property.images, ...newImages];
-    }
+    // Update images
+    updateData.images = imageUrls;
 
     const updatedProperty = await Property.findByIdAndUpdate(
       req.params.id,
