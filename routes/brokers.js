@@ -9,10 +9,36 @@ const { uploadToS3 } = require('../config/s3');
 const router = express.Router();
 
 // Register broker/sub-broker
-router.post('/register', uploadToS3.fields([
-  { name: 'profilePic', maxCount: 1 },
-  { name: 'kycDocument', maxCount: 1 }
-]), async (req, res) => {
+router.post('/register', (req, res, next) => {
+  const upload = uploadToS3.fields([
+    { name: 'profilePic', maxCount: 1 },
+    { name: 'kycDocument', maxCount: 1 }
+  ]);
+  
+  upload(req, res, (err) => {
+    if (err) {
+      console.error('Upload middleware error:', err);
+      
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'File size too large. Maximum 5MB allowed.' });
+      }
+      
+      if (err.message && err.message.includes('image files')) {
+        return res.status(400).json({ message: 'Only image files are allowed (jpeg, jpg, png, gif, webp)' });
+      }
+      
+      if (err.message && err.message.includes('PermanentRedirect')) {
+        return res.status(500).json({ message: 'Storage configuration error. Please contact support.' });
+      }
+      
+      return res.status(500).json({ 
+        message: 'File upload failed', 
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+      });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { 
       email, 
@@ -104,7 +130,24 @@ router.post('/register', uploadToS3.fields([
     });
   } catch (error) {
     console.error('Broker registration error:', error);
-    res.status(500).json({ message: 'Server error during broker registration' });
+    
+    // Check if it's a multer/upload error
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File size too large. Maximum 5MB allowed.' });
+    }
+    
+    if (error.message && error.message.includes('image files')) {
+      return res.status(400).json({ message: 'Only image files are allowed (jpeg, jpg, png, gif, webp)' });
+    }
+    
+    if (error.message && error.message.includes('AWS')) {
+      return res.status(500).json({ message: 'File upload failed. Please try again.' });
+    }
+    
+    res.status(500).json({ 
+      message: 'Server error during broker registration',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 

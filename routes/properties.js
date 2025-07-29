@@ -121,8 +121,8 @@ router.get('/:id', async (req, res) => {
 router.post('/', auth.auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
-    if (!user || !['broker', 'sub_broker'].includes(user.userType)) {
-      return res.status(403).json({ message: 'Only brokers can create properties' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
     const {
@@ -303,7 +303,37 @@ router.post('/:id/favorite', auth.auth, async (req, res) => {
   }
 });
 
-// Get broker's properties
+// Get user's properties (works for all user types)
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const properties = await Property.find({ brokerId: req.params.userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const total = await Property.countDocuments({ brokerId: req.params.userId });
+
+    res.json({
+      properties,
+      pagination: {
+        current: page,
+        pages: Math.ceil(total / limit),
+        total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user properties:', error);
+    res.status(500).json({ message: 'Server error fetching user properties' });
+  }
+});
+
+// Get broker's properties (legacy endpoint - kept for backward compatibility)
 router.get('/broker/:brokerId', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
