@@ -1,0 +1,168 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches:
+      - main      # Deploy to production
+      - develop   # Deploy to development
+  pull_request:
+    branches:
+      - main
+    types: [closed]
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
+  deploy-dev:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: development
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: snk-backend
+          IMAGE_TAG: dev-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:dev
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:dev
+
+      - name: Deploy to ECS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: snk-backend
+          IMAGE_TAG: dev-${{ github.sha }}
+        run: |
+          # Replace placeholders in task definition
+          sed -e "s|YOUR_ACCOUNT_ID|${{ secrets.AWS_ACCOUNT_ID }}|g" \
+              -e "s|:dev|:$IMAGE_TAG|g" \
+              aws/ecs-task-definition-dev.json > task-definition-dev.json
+          
+          # Register new task definition
+          aws ecs register-task-definition \
+            --cli-input-json file://task-definition-dev.json
+          
+          # Update service with new task definition
+          aws ecs update-service \
+            --cluster snk-cluster \
+            --service snk-backend-dev \
+            --task-definition snk-backend-dev
+
+      - name: Wait for deployment
+        run: |
+          aws ecs wait services-stable \
+            --cluster snk-cluster \
+            --services snk-backend-dev
+
+  deploy-prod:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: snk-backend
+          IMAGE_TAG: prod-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:prod
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:prod
+
+      - name: Deploy to ECS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: snk-backend
+          IMAGE_TAG: prod-${{ github.sha }}
+        run: |
+          # Replace placeholders in task definition
+          sed -e "s|YOUR_ACCOUNT_ID|${{ secrets.AWS_ACCOUNT_ID }}|g" \
+              -e "s|:prod|:$IMAGE_TAG|g" \
+              aws/ecs-task-definition-prod.json > task-definition-prod.json
+          
+          # Register new task definition
+          aws ecs register-task-definition \
+            --cli-input-json file://task-definition-prod.json
+          
+          # Update service with new task definition
+          aws ecs update-service \
+            --cluster snk-cluster \
+            --service snk-backend-prod \
+            --task-definition snk-backend-prod
+
+      - name: Wait for deployment
+        run: |
+          aws ecs wait services-stable \
+            --cluster snk-cluster \
+            --services snk-backend-prod
+
+  notify:
+    needs: [deploy-dev, deploy-prod]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment Notification
+        run: |
+          if [ "${{ needs.deploy-dev.result }}" == "success" ]; then
+            echo "✅ Development deployment completed successfully"
+          elif [ "${{ needs.deploy-prod.result }}" == "success" ]; then
+            echo "✅ Production deployment completed successfully"
+          else
+            echo "❌ Deployment failed"
+          fi

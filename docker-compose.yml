@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  snk-backend-dev:
+    build: .
+    container_name: snk-backend-dev
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - .env.development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - snk-network
+
+  snk-backend-prod:
+    build: .
+    container_name: snk-backend-prod
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env.production
+    networks:
+      - snk-network
+
+networks:
+  snk-network:
+    driver: bridge

@@ -140,20 +140,51 @@ router.post('/', auth.auth, async (req, res) => {
       features
     } = req.body;
 
+    // Validate required fields
+    if (!title || !description || !propertyType || !transactionType || !price || !area || !location) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Validate location structure
+    if (!location.address || !location.city || !location.state || !location.pincode) {
+      return res.status(400).json({ message: 'Location must include address, city, state, and pincode' });
+    }
+
+    // Validate price and area are positive numbers
+    const parsedPrice = parseFloat(price);
+    const parsedArea = parseFloat(area);
+    
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      return res.status(400).json({ message: 'Price must be a positive number' });
+    }
+    
+    if (isNaN(parsedArea) || parsedArea <= 0) {
+      return res.status(400).json({ message: 'Area must be a positive number' });
+    }
+
     // Images are now passed as URLs (already uploaded to S3 from frontend)
     const imageUrls = req.body.images || [];
+    
+    if (!imageUrls || imageUrls.length === 0) {
+      return res.status(400).json({ message: 'At least one image is required' });
+    }
 
     const property = new Property({
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
       propertyType,
       transactionType,
-      price: parseFloat(price),
-      area: parseFloat(area),
-      areaUnit,
+      price: parsedPrice,
+      area: parsedArea,
+      areaUnit: areaUnit || 'sq ft',
       bedrooms: bedrooms ? parseInt(bedrooms) : undefined,
       bathrooms: bathrooms ? parseInt(bathrooms) : undefined,
-      location: location,
+      location: {
+        address: location.address.trim(),
+        city: location.city.trim(),
+        state: location.state.trim(),
+        pincode: location.pincode.trim()
+      },
       amenities: amenities || [],
       features: features || [],
       images: imageUrls,
@@ -170,6 +201,15 @@ router.post('/', auth.auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating property:', error);
+    
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: validationErrors 
+      });
+    }
+    
     res.status(500).json({ message: 'Server error creating property' });
   }
 });
