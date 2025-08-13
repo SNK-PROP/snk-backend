@@ -33,10 +33,10 @@ app.use('/api/', limiter);
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*',
+  origin: '*',
   credentials: true,
   optionsSuccessStatus: 200
-};
+}; 
 app.use(cors(corsOptions));
 
 // Body parsing middleware
@@ -44,7 +44,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:admin@cluster0.zist3g3.mongodb.net/snk-dev';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin:admin@cluster0.zist3g3.mongodb.net/';
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
