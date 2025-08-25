@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/User');
 const Statistics = require('../models/Statistics');
+const Employee = require('../models/Employee');
+const ReferralStats = require('../models/ReferralStats');
 const auth = require('../middleware/auth');
 const emailService = require('../services/emailService');
 
@@ -13,7 +15,7 @@ const router = express.Router();
 // Register new user
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, fullName, contactNumber, location, propertyType } = req.body;
+    const { email, password, fullName, contactNumber, location, propertyType, referralCode, userType } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -21,9 +23,25 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
+    // Validate referral code if provided
+    let referringEmployee = null;
+    if (referralCode) {
+      referringEmployee = await Employee.findOne({ 
+        referralCode: referralCode.toUpperCase(), 
+        isActive: true 
+      });
+      
+      if (!referringEmployee) {
+        return res.status(400).json({ message: 'Invalid referral code' });
+      }
+    }
+
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Determine user type (default to 'user' if not specified)
+    const finalUserType = userType || 'user';
 
     // Create new user
     const user = new User({
@@ -33,10 +51,34 @@ router.post('/register', async (req, res) => {
       contactNumber,
       location,
       propertyType: propertyType || [],
-      userType: 'user'
+      userType: finalUserType,
+      referredBy: referringEmployee?._id || null,
+      referralCode: referralCode?.toUpperCase() || null,
+      referralDate: referringEmployee ? new Date() : null
     });
 
     await user.save();
+
+    // Update referral statistics if user was referred
+    if (referringEmployee) {
+      try {
+        const commission = finalUserType === 'broker' ? 
+          referringEmployee.commissionRates.brokerRegistration : 
+          referringEmployee.commissionRates.userRegistration;
+
+        await ReferralStats.updateStats(
+          referringEmployee._id, 
+          finalUserType, 
+          commission, 
+          false
+        );
+
+        console.log(`Referral tracked: ${referringEmployee.employeeName} referred ${finalUserType} ${fullName}`);
+      } catch (referralError) {
+        console.error('Error tracking referral:', referralError);
+        // Don't fail registration if referral tracking fails
+      }
+    }
 
     // Update user statistics
     await updateUserStats(1);
@@ -64,6 +106,10 @@ router.post('/register', async (req, res) => {
         location: user.location,
         propertyType: user.propertyType,
         userType: user.userType,
+        referredBy: referringEmployee ? {
+          employeeName: referringEmployee.employeeName,
+          referralCode: referringEmployee.referralCode
+        } : null,
         createdAt: user.createdAt
       }
     });

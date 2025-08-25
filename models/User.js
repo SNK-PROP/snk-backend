@@ -97,6 +97,30 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: {
     type: Date,
     default: null
+  },
+  // Referral tracking fields
+  referredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    default: null
+  },
+  referralCode: {
+    type: String,
+    default: null,
+    trim: true,
+    uppercase: true
+  },
+  referralDate: {
+    type: Date,
+    default: null
+  },
+  isFirstPropertyListed: {
+    type: Boolean,
+    default: false // Track if broker has listed their first property
+  },
+  firstPropertyDate: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true // This automatically adds createdAt and updatedAt
@@ -107,5 +131,7 @@ userSchema.index({ email: 1 });
 userSchema.index({ userType: 1 });
 userSchema.index({ contactNumber: 1 });
 userSchema.index({ firebaseId: 1 });
+userSchema.index({ referredBy: 1 });
+userSchema.index({ referralCode: 1 });
 
 module.exports = mongoose.model('User', userSchema);

@@ -3,6 +3,7 @@ const Property = require('../models/Property');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { uploadToS3, getS3Url } = require('../config/s3');
+const ReferralService = require('../services/referralService');
 
 const router = express.Router();
 
@@ -194,6 +195,16 @@ router.post('/', auth.auth, async (req, res) => {
     });
 
     await property.save();
+
+    // Track first property bonus if user is a broker
+    if (user.userType === 'broker') {
+      try {
+        await ReferralService.trackBrokerFirstProperty(user._id);
+      } catch (referralError) {
+        console.error('Error tracking first property bonus:', referralError);
+        // Don't fail the property creation if referral tracking fails
+      }
+    }
 
     res.status(201).json({
       message: 'Property created successfully',
