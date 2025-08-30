@@ -7,8 +7,9 @@ WORKDIR /app
 # Copy package.json and package-lock.json (if available)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies and curl for health check
+RUN apk add --no-cache curl && \
+    npm ci --only=production && npm cache clean --force
 
 # Copy the rest of the application code
 COPY . .

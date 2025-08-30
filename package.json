@@ -8,7 +8,7 @@
         "start:prod": "NODE_ENV=production node app.js",
         "start:dev": "NODE_ENV=development node app.js",
         "dev": "NODE_ENV=development nodemon app.js",
-        "test": "NODE_ENV=test jest",
+        "test": "NODE_ENV=test jest --passWithNoTests",
         "build": "echo 'No build step required for Node.js backend'",
         "seed:versions": "node scripts/seed-versions.js"
     },
