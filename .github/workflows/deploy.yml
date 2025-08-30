@@ -1,6 +1,6 @@
 name: Deploy to AWS ECS
 
-on:
+on: 
   push:
     branches:
       - main      # Deploy to production
