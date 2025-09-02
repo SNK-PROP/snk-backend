@@ -41,6 +41,10 @@ class EmailService {
   async sendPasswordResetEmail(email, resetToken) {
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
     
+    // Always log the reset URL for debugging
+    console.log('🔗 Password Reset URL Generated:', resetUrl);
+    console.log('🌐 FRONTEND_URL:', process.env.FRONTEND_URL);
+    
     const mailOptions = {
       from: process.env.FROM_EMAIL || '"SNK Properties" <noreply@snkproperties.com>',
       to: email,
