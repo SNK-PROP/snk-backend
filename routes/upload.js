@@ -1,5 +1,5 @@
 const express = require('express');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { v4: uuidv4 } = require('uuid');
 const auth = require('../middleware/auth');
@@ -61,8 +61,9 @@ router.post('/presigned-url', auth.auth, async (req, res) => {
       expiresIn: 600 
     });
 
-    // Generate the final URL where the file will be accessible
-    const fileUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${key}`;
+    // Generate the final URL where the file will be accessible through our backend
+    const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+    const fileUrl = `${baseUrl}/api/upload/image/${key}`;
 
     res.json({
       presignedUrl,
@@ -141,8 +142,9 @@ router.post('/presigned-urls', auth.auth, async (req, res) => {
         expiresIn: 600 
       });
 
-      // Generate the final URL where the file will be accessible
-      const fileUrl = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${key}`;
+      // Generate the final URL where the file will be accessible through our backend
+      const baseUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`;
+      const fileUrl = `${baseUrl}/api/upload/image/${key}`;
 
       presignedUrls.push({
         originalFileName: fileName,
@@ -162,6 +164,37 @@ router.post('/presigned-urls', auth.auth, async (req, res) => {
     console.error('Error generating presigned URLs:', error);
     res.status(500).json({ 
       message: 'Error generating presigned URLs',
+      error: error.message 
+    });
+  }
+});
+
+// Serve images from S3 through the backend (bypasses bucket policy requirements)
+router.get('/image/:key(*)', async (req, res) => {
+  try {
+    const key = req.params.key;
+    
+    if (!key) {
+      return res.status(400).json({ message: 'Image key is required' });
+    }
+
+    // Generate a signed URL for the private S3 object
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const signedUrl = await getSignedUrl(s3Client, command, { 
+      expiresIn: 3600 // 1 hour
+    });
+
+    // Redirect to the signed URL
+    res.redirect(signedUrl);
+
+  } catch (error) {
+    console.error('Error serving image:', error);
+    res.status(404).json({ 
+      message: 'Image not found',
       error: error.message 
     });
   }
