@@ -110,6 +110,22 @@ const propertySchema = new mongoose.Schema({
     enum: ['Active', 'Inactive', 'Sold', 'Rented'],
     default: 'Active'
   },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
+  },
+  approvedAt: {
+    type: Date
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  rejectionReason: {
+    type: String,
+    trim: true
+  },
   isFeatured: {
     type: Boolean,
     default: false
@@ -149,6 +165,7 @@ propertySchema.index({ brokerId: 1 });
 propertySchema.index({ propertyType: 1 });
 propertySchema.index({ transactionType: 1 });
 propertySchema.index({ status: 1 });
+propertySchema.index({ approvalStatus: 1 });
 propertySchema.index({ isFeatured: 1 });
 propertySchema.index({ 'location.city': 1 });
 propertySchema.index({ 'location.state': 1 });

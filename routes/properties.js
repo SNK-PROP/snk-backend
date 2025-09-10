@@ -14,8 +14,8 @@ router.get('/', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Build filter object
-    const filter = { status: 'Active' };
+    // Build filter object - only show approved properties to public
+    const filter = { status: 'Active', approvalStatus: 'approved' };
     
     if (req.query.propertyType) {
       filter.propertyType = req.query.propertyType;
@@ -83,7 +83,8 @@ router.get('/featured', async (req, res) => {
     const limit = parseInt(req.query.limit) || 6;
     
     const properties = await Property.find({ 
-      status: 'Active', 
+      status: 'Active',
+      approvalStatus: 'approved',
       isFeatured: true 
     })
     .sort({ createdAt: -1 })
@@ -411,6 +412,210 @@ router.get('/broker/:brokerId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching broker properties:', error);
     res.status(500).json({ message: 'Server error fetching broker properties' });
+  }
+});
+
+// Admin routes for property approval management
+router.get('/admin/all', auth.auth, auth.requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // Build filter object for admin - can see all properties
+    const filter = {};
+    
+    if (req.query.approvalStatus) {
+      filter.approvalStatus = req.query.approvalStatus;
+    }
+    
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+    
+    if (req.query.propertyType) {
+      filter.propertyType = req.query.propertyType;
+    }
+    
+    if (req.query.city) {
+      filter['location.city'] = new RegExp(req.query.city, 'i');
+    }
+
+    // Sort options
+    let sortOptions = { createdAt: -1 };
+    if (req.query.sortBy === 'price') {
+      sortOptions = { price: req.query.sortOrder === 'desc' ? -1 : 1 };
+    }
+
+    const properties = await Property.find(filter)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limit)
+      .populate('brokerId', 'fullName contactNumber email')
+      .populate('approvedBy', 'fullName email');
+
+    const total = await Property.countDocuments(filter);
+
+    res.json({
+      properties,
+      pagination: {
+        current: page,
+        pages: Math.ceil(total / limit),
+        total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching admin properties:', error);
+    res.status(500).json({ message: 'Server error fetching properties' });
+  }
+});
+
+// Admin route to get pending properties for approval
+router.get('/admin/pending', auth.auth, auth.requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const properties = await Property.find({ approvalStatus: 'pending' })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('brokerId', 'fullName contactNumber email');
+
+    const total = await Property.countDocuments({ approvalStatus: 'pending' });
+
+    res.json({
+      properties,
+      pagination: {
+        current: page,
+        pages: Math.ceil(total / limit),
+        total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching pending properties:', error);
+    res.status(500).json({ message: 'Server error fetching pending properties' });
+  }
+});
+
+// Admin route to approve property
+router.put('/admin/:id/approve', auth.auth, auth.requireAdmin, async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    property.approvalStatus = 'approved';
+    property.approvedAt = new Date();
+    property.approvedBy = req.user.userId;
+    property.rejectionReason = undefined; // Clear any previous rejection reason
+
+    await property.save();
+
+    res.json({
+      message: 'Property approved successfully',
+      property
+    });
+  } catch (error) {
+    console.error('Error approving property:', error);
+    res.status(500).json({ message: 'Server error approving property' });
+  }
+});
+
+// Admin route to reject property
+router.put('/admin/:id/reject', auth.auth, auth.requireAdmin, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    property.approvalStatus = 'rejected';
+    property.rejectionReason = reason || 'No reason provided';
+    property.approvedAt = undefined;
+    property.approvedBy = undefined;
+
+    await property.save();
+
+    res.json({
+      message: 'Property rejected successfully',
+      property
+    });
+  } catch (error) {
+    console.error('Error rejecting property:', error);
+    res.status(500).json({ message: 'Server error rejecting property' });
+  }
+});
+
+// Admin route to update property details
+router.put('/admin/:id/edit', auth.auth, auth.requireAdmin, async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    const {
+      title,
+      description,
+      propertyType,
+      transactionType,
+      price,
+      area,
+      areaUnit,
+      bedrooms,
+      bathrooms,
+      location,
+      amenities,
+      features,
+      status,
+      isFeatured
+    } = req.body;
+
+    // Update property fields
+    const updateData = {
+      title: title || property.title,
+      description: description || property.description,
+      propertyType: propertyType || property.propertyType,
+      transactionType: transactionType || property.transactionType,
+      price: price ? parseFloat(price) : property.price,
+      area: area ? parseFloat(area) : property.area,
+      areaUnit: areaUnit || property.areaUnit,
+      bedrooms: bedrooms !== undefined ? parseInt(bedrooms) : property.bedrooms,
+      bathrooms: bathrooms !== undefined ? parseInt(bathrooms) : property.bathrooms,
+      location: location || property.location,
+      amenities: amenities || property.amenities,
+      features: features || property.features,
+      status: status || property.status,
+      isFeatured: isFeatured !== undefined ? isFeatured : property.isFeatured
+    };
+
+    // Update images if provided
+    if (req.body.images) {
+      updateData.images = req.body.images;
+    }
+
+    const updatedProperty = await Property.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    res.json({
+      message: 'Property updated successfully',
+      property: updatedProperty
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ message: 'Server error updating property' });
   }
 });
 
