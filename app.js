@@ -14,6 +14,7 @@ const propertiesRoutes = require('./routes/properties');
 const brokersRoutes = require('./routes/brokers');
 const employeesRoutes = require('./routes/employees');
 const appRoutes = require('./routes/app');
+const notificationsRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,6 +70,7 @@ app.use('/api/properties', propertiesRoutes);
 app.use('/api/brokers', brokersRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/app', appRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api/upload', require('./routes/upload'));
 
 // Health check route

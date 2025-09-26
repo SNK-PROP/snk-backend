@@ -121,6 +121,66 @@ const userSchema = new mongoose.Schema({
   firstPropertyDate: {
     type: Date,
     default: null
+  },
+  // Push notification fields
+  pushTokens: [{
+    token: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    platform: {
+      type: String,
+      enum: ['ios', 'android'],
+      required: true
+    },
+    endpointArn: {
+      type: String,
+      default: null
+    },
+    active: {
+      type: Boolean,
+      default: true
+    },
+    deviceInfo: {
+      deviceId: String,
+      deviceName: String,
+      appVersion: String
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  notificationPreferences: {
+    propertyUpdates: {
+      type: Boolean,
+      default: true
+    },
+    referralUpdates: {
+      type: Boolean,
+      default: true
+    },
+    marketing: {
+      type: Boolean,
+      default: false
+    },
+    system: {
+      type: Boolean,
+      default: true
+    },
+    priceAlerts: {
+      type: Boolean,
+      default: true
+    },
+    newPropertiesInArea: {
+      type: Boolean,
+      default: true
+    }
+  },
+  lastNotificationRead: {
+    type: Date,
+    default: Date.now
   }
 }, {
   timestamps: true // This automatically adds createdAt and updatedAt
