@@ -39,7 +39,7 @@ echo "Run: aws configure"
 echo "Enter:"
 echo "  AWS Access Key ID: AKIAUAGWCAYYYPM6AQGR"
 echo "  AWS Secret Access Key: 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"
-echo "  Default region: eu-north-1"
+echo "  Default region: us-east-1"
 echo "  Default output format: json"
 
 # Download deployment package from S3

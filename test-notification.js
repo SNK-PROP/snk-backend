@@ -7,7 +7,7 @@ const FCM_TOKEN = 'dl7hGuwcQ0ufGB0XFLwN6u:APA91bHkmmKYY0oW69qXd--B0vK2he4uTwxedR
 class TestNotificationService {
     constructor() {
         this.snsClient = new SNSClient({
-            region: process.env.AWS_REGION || 'eu-north-1',
+            region: process.env.AWS_REGION || 'us-east-1',
             credentials: {
                 accessKeyId: process.env.AWS_ACCESS_KEY_ID,
                 secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -36,6 +36,15 @@ class TestNotificationService {
             console.log('✅ Created platform endpoint:', response.EndpointArn);
             return response.EndpointArn;
         } catch (error) {
+            if (error.message.includes('already exists with the same Token')) {
+                // Extract existing endpoint ARN from error message
+                const arnMatch = error.message.match(/arn:aws:sns:[^:]+:[^:]+:endpoint\/[^\/]+\/[^\/]+\/[^\s]+/);
+                if (arnMatch) {
+                    const existingEndpointArn = arnMatch[0];
+                    console.log('📱 Using existing endpoint:', existingEndpointArn);
+                    return existingEndpointArn;
+                }
+            }
             console.error('❌ Failed to create platform endpoint:', error.message);
             throw error;
         }

@@ -10749,7 +10749,7 @@
         "ap-southeast-2",
         "ap-northeast-1",
         "ap-northeast-2",
-        "eu-north-1"
+        "us-east-1"
       ]
     },
     "RegisterContainerImageRequest":{
@@ -12283,7 +12283,7 @@
         },
         "httpProtocolIpv6":{
           "shape":"HttpProtocolIpv6",
-          "documentation":"<p>Enables or disables the IPv6 endpoint for the instance metadata service. This setting applies only when the HTTP metadata endpoint is enabled.</p> <note> <p>This parameter is available only for instances in the Europe (Stockholm) Amazon Web Services Region (<code>eu-north-1</code>).</p> </note>"
+          "documentation":"<p>Enables or disables the IPv6 endpoint for the instance metadata service. This setting applies only when the HTTP metadata endpoint is enabled.</p> <note> <p>This parameter is available only for instances in the Europe (Stockholm) Amazon Web Services Region (<code>us-east-1</code>).</p> </note>"
         }
       }
     },

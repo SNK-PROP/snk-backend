@@ -28,7 +28,7 @@ heroku config:set MONGODB_URI="mongodb+srv://admin:admin@cluster0.zist3g3.mongod
 heroku config:set JWT_SECRET="secure_jwt_secret_for_production" -a $APP_NAME
 heroku config:set AWS_ACCESS_KEY_ID="AKIAUAGWCAYYYPM6AQGR" -a $APP_NAME
 heroku config:set AWS_SECRET_ACCESS_KEY="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" -a $APP_NAME
-heroku config:set AWS_REGION="eu-north-1" -a $APP_NAME
+heroku config:set AWS_REGION="us-east-1" -a $APP_NAME
 heroku config:set S3_BUCKET_NAME="snk-prop" -a $APP_NAME
 
 # Deploy to Heroku
