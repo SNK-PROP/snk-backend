@@ -18789,7 +18789,7 @@
         },
         "Destination":{
           "shape":"String",
-          "documentation":"<p>The Region or Availability Zone that's the target for the data query. For example, <code>eu-north-1</code>.</p>"
+          "documentation":"<p>The Region or Availability Zone that's the target for the data query. For example, <code>us-east-1</code>.</p>"
         },
         "Metric":{
           "shape":"MetricType",
@@ -29340,7 +29340,7 @@
         },
         "Destination":{
           "shape":"String",
-          "documentation":"<p>The target Region or Availability Zone that the metric subscription is disabled for. For example, <code>eu-north-1</code>.</p>"
+          "documentation":"<p>The target Region or Availability Zone that the metric subscription is disabled for. For example, <code>us-east-1</code>.</p>"
         },
         "Metric":{
           "shape":"MetricType",
