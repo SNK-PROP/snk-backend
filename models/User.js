@@ -38,7 +38,7 @@ const userSchema = new mongoose.Schema({
   },
   propertyType: [{
     type: String,
-    enum: ['Apartment', 'House', 'Villa', 'Cottage', 'Commercial', 'Land']
+    enum: ['Villa', 'Commercial', 'Land', 'Farmhouse', 'Warehouse']
   }],
   userType: {
     type: String,
