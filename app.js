@@ -14,6 +14,8 @@ const propertiesRoutes = require('./routes/properties');
 const brokersRoutes = require('./routes/brokers');
 const employeesRoutes = require('./routes/employees');
 const appRoutes = require('./routes/app');
+const notificationRoutes = require('./routes/notifications');
+const notificationService = require('./services/notificationService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -56,6 +58,40 @@ mongoose.connect(MONGODB_URI, {
   if (process.env.DEBUG === 'true') {
     console.log(`Connected to: ${MONGODB_URI.replace(/\/\/.*@/, '//***:***@')}`);
   }
+
+  // Initialize notification service
+  if (notificationService.isServiceInitialized()) {
+    console.log('✅ Firebase Admin SDK initialized successfully');
+
+    // Schedule periodic tasks
+    setInterval(async () => {
+      try {
+        await notificationService.processPendingNotifications();
+        await notificationService.retryFailedNotifications();
+      } catch (error) {
+        console.error('Error processing scheduled notifications:', error);
+      }
+    }, 60000); // Check every minute
+
+    // Schedule cleanup task (daily at 2 AM)
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        if (now.getHours() === 2 && now.getMinutes() === 0) {
+          await notificationService.cleanupOldData();
+          console.log('Daily cleanup task completed');
+        }
+      } catch (error) {
+        console.error('Error during cleanup task:', error);
+      }
+    }, 60000); // Check every minute
+
+    console.log('🔔 Notification scheduler started');
+  } else {
+    console.log('⚠️ Firebase Admin SDK not initialized - notifications will be disabled');
+    console.log('To enable notifications, download your service account key from Firebase Console');
+    console.log('and save it as firebase-service-account.json in the backend root directory');
+  }
 })
 .catch(err => {
   console.error('MongoDB connection error:', err);
@@ -69,6 +105,7 @@ app.use('/api/properties', propertiesRoutes);
 app.use('/api/brokers', brokersRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/app', appRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', require('./routes/upload'));
 
 // Health check route
