@@ -9,8 +9,8 @@ Output::
     {
         "Regions": [
             {
-                "Endpoint": "ec2.eu-north-1.amazonaws.com",
-                "RegionName": "eu-north-1",
+                "Endpoint": "ec2.us-east-1.amazonaws.com",
+                "RegionName": "us-east-1",
                 "OptInStatus": "opt-in-not-required"
             },
             {
@@ -142,8 +142,8 @@ Output::
     {
         "Regions": [
             {
-                "Endpoint": "ec2.eu-north-1.amazonaws.com",
-                "RegionName": "eu-north-1",
+                "Endpoint": "ec2.us-east-1.amazonaws.com",
+                "RegionName": "us-east-1",
                 "OptInStatus": "opt-in-not-required"
             },
             {
@@ -252,7 +252,7 @@ The following ``describe-regions`` example uses the ``--query`` parameter to fil
 
 Output::
 
-    eu-north-1
+    us-east-1
     ap-south-1
     eu-west-3
     eu-west-2

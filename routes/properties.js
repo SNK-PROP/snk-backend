@@ -4,6 +4,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { uploadToS3, getS3Url } = require('../config/s3');
 const ReferralService = require('../services/referralService');
+const snsService = require('../services/snsService');
 
 const router = express.Router();
 
@@ -207,6 +208,39 @@ router.post('/', auth.auth, async (req, res) => {
       }
     }
 
+    // Send new property notifications to interested users
+    try {
+      const interestedUsers = await User.find({
+        notificationPreferences: {
+          $or: [
+            { 'newPropertiesInArea': true },
+            { 'propertyUpdates': true }
+          ]
+        },
+        pushTokens: { $elemMatch: { active: true } },
+        _id: { $ne: user._id } // Don't send to property creator
+      }).select('pushTokens notificationPreferences fullName');
+
+      if (interestedUsers.length > 0) {
+        await snsService.sendPropertyNotification(
+          interestedUsers,
+          'NEW_PROPERTY',
+          {
+            _id: property._id,
+            title: property.title,
+            location: `${property.location.city}, ${property.location.state}`,
+            price: property.price,
+            propertyType: property.propertyType,
+            transactionType: property.transactionType
+          }
+        );
+        console.log(`📢 New property notifications sent to ${interestedUsers.length} users`);
+      }
+    } catch (notificationError) {
+      console.error('Error sending new property notifications:', notificationError);
+      // Don't fail property creation if notifications fail
+    }
+
     res.status(201).json({
       message: 'Property created successfully',
       property
@@ -258,13 +292,19 @@ router.put('/:id', auth.auth, async (req, res) => {
     // Images are now passed as URLs (already uploaded to S3 from frontend)
     const imageUrls = req.body.images || property.images;
 
+    // Check for price changes before update
+    const oldPrice = property.price;
+    const newPrice = parseFloat(price);
+    const priceChanged = oldPrice !== newPrice;
+    const priceDropped = newPrice < oldPrice;
+
     // Update property fields
     const updateData = {
       title,
       description,
       propertyType,
       transactionType,
-      price: parseFloat(price),
+      price: newPrice,
       area: parseFloat(area),
       areaUnit,
       bedrooms: bedrooms ? parseInt(bedrooms) : undefined,
@@ -286,6 +326,60 @@ router.put('/:id', auth.auth, async (req, res) => {
       updateData,
       { new: true, runValidators: true }
     );
+
+    // Send notifications for significant updates
+    try {
+      // Price drop notifications
+      if (priceChanged && priceDropped) {
+        // Find users who have this property in favorites
+        const favoritedByUsers = await User.find({
+          _id: { $in: property.favorites },
+          'notificationPreferences.priceAlerts': true,
+          pushTokens: { $elemMatch: { active: true } }
+        }).select('pushTokens notificationPreferences fullName');
+
+        if (favoritedByUsers.length > 0) {
+          await snsService.sendPropertyNotification(
+            favoritedByUsers,
+            'PRICE_DROP',
+            {
+              _id: updatedProperty._id,
+              title: updatedProperty.title,
+              location: `${updatedProperty.location.city}, ${updatedProperty.location.state}`,
+              price: updatedProperty.price,
+              oldPrice: oldPrice
+            }
+          );
+          console.log(`📢 Price drop notifications sent to ${favoritedByUsers.length} users`);
+        }
+      }
+
+      // General property update notifications for favorites
+      if (title !== property.title || description !== property.description) {
+        const favoritedByUsers = await User.find({
+          _id: { $in: property.favorites },
+          'notificationPreferences.propertyUpdates': true,
+          pushTokens: { $elemMatch: { active: true } }
+        }).select('pushTokens notificationPreferences fullName');
+
+        if (favoritedByUsers.length > 0) {
+          await snsService.sendPropertyNotification(
+            favoritedByUsers,
+            'FAVORITE_UPDATE',
+            {
+              _id: updatedProperty._id,
+              title: updatedProperty.title,
+              location: `${updatedProperty.location.city}, ${updatedProperty.location.state}`,
+              updateType: 'details'
+            }
+          );
+          console.log(`📢 Property update notifications sent to ${favoritedByUsers.length} users`);
+        }
+      }
+    } catch (notificationError) {
+      console.error('Error sending property update notifications:', notificationError);
+      // Don't fail property update if notifications fail
+    }
 
     res.json({
       message: 'Property updated successfully',

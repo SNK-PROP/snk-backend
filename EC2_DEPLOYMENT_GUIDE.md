@@ -136,7 +136,7 @@ Your deployment package includes these environment settings:
 NODE_ENV=production
 PORT=5000
 MONGODB_URI=mongodb+srv://admin:admin@cluster0.zist3g3.mongodb.net/snk-prod
-AWS_REGION=eu-north-1
+AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=AKIAUAGWCAYYYPM6AQGR
 AWS_SECRET_ACCESS_KEY=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
 S3_BUCKET_NAME=snk-property-images-prod
